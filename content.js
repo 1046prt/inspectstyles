@@ -66,11 +66,15 @@ class InspectStyles {
       existingSidebar.remove();
     }
 
-    const existingOverlay = document.querySelector(
-      '[style*="border: 2px solid #007acc"]'
-    );
+    const existingOverlay = document.querySelector(".inspectstyles-overlay");
     if (existingOverlay) {
       existingOverlay.remove();
+    }
+
+    // Remove injected CSS
+    const existingCSS = document.getElementById("inspectstyles-css");
+    if (existingCSS) {
+      existingCSS.remove();
     }
 
     // Restore page layout
@@ -106,10 +110,19 @@ class InspectStyles {
   }
 
   createSidebar() {
+    // Inject CSS if not already injected
+    this.injectCSS();
+
     this.sidebar = document.createElement("div");
     this.sidebar.id = "inspectstyles-sidebar";
+    this.sidebar.className = "inspectstyles-sidebar";
+
+    // Load saved width preference
+    const width = this.loadWidthPreference();
+    this.sidebarWidth = width;
+    this.sidebar.style.width = width + "px";
+
     this.sidebar.innerHTML = this.getSidebarHTML();
-    this.sidebar.style.cssText = this.getSidebarCSS();
     document.body.appendChild(this.sidebar);
 
     // Add event listeners for sidebar interactions
@@ -119,27 +132,18 @@ class InspectStyles {
     this.addResizeHandle();
   }
 
-  getSidebarCSS() {
-    // Load saved width preference
-    const width = this.loadWidthPreference();
-    this.sidebarWidth = width;
+  injectCSS() {
+    // Check if CSS is already injected
+    if (document.getElementById("inspectstyles-css")) {
+      return;
+    }
 
-    return `
-      position: fixed;
-      top: 0;
-      right: 0;
-      width: ${width}px;
-      height: 100vh;
-      background: #f8f9fa;
-      color: #2d3748;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      font-size: 13px;
-      z-index: 2147483647;
-      box-shadow: -4px 0 20px rgba(0,0,0,0.08);
-      overflow-y: auto;
-      border-left: 1px solid #e2e8f0;
-      transition: transform 0.2s ease;
-    `;
+    const link = document.createElement("link");
+    link.id = "inspectstyles-css";
+    link.rel = "stylesheet";
+    link.type = "text/css";
+    link.href = chrome.runtime.getURL("styles/sidebar.css");
+    document.head.appendChild(link);
   }
 
   addSidebarEventListeners() {
@@ -160,84 +164,84 @@ class InspectStyles {
     const iconUrl = chrome.runtime.getURL("icons/InspectStyles.png");
     return `
       <!-- Resize Handle -->
-      <div id="inspectstyles-resize-handle" style="position: absolute; left: 0; top: 0; width: 6px; height: 100%; background: #f1f5f9; cursor: ew-resize; z-index: 10; transition: background 0.2s; display: flex; align-items: center; justify-content: center; border-right: 1px solid #e2e8f0;">
-        <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5px;">
-          <div style="width: 0; height: 0; border-left: 2.5px solid transparent; border-right: 2.5px solid transparent; border-bottom: 2.5px solid #9ca3af;"></div>
-          <div style="width: 5px; height: 1px; background: #9ca3af; border-radius: 0.5px;"></div>
-          <div style="width: 5px; height: 1px; background: #9ca3af; border-radius: 0.5px;"></div>
-          <div style="width: 5px; height: 1px; background: #9ca3af; border-radius: 0.5px;"></div>
-          <div style="width: 5px; height: 1px; background: #9ca3af; border-radius: 0.5px;"></div>
-          <div style="width: 5px; height: 1px; background: #9ca3af; border-radius: 0.5px;"></div>
-          <div style="width: 5px; height: 1px; background: #9ca3af; border-radius: 0.5px;"></div>
-          <div style="width: 0; height: 0; border-left: 2.5px solid transparent; border-right: 2.5px solid transparent; border-top: 2.5px solid #9ca3af;"></div>
+      <div id="inspectstyles-resize-handle" class="inspectstyles-resize-handle">
+        <div class="inspectstyles-resize-icon">
+          <div class="inspectstyles-resize-arrow-up"></div>
+          <div class="inspectstyles-resize-line"></div>
+          <div class="inspectstyles-resize-line"></div>
+          <div class="inspectstyles-resize-line"></div>
+          <div class="inspectstyles-resize-line"></div>
+          <div class="inspectstyles-resize-line"></div>
+          <div class="inspectstyles-resize-line"></div>
+          <div class="inspectstyles-resize-arrow-down"></div>
         </div>
       </div>
       
-      <div style="height: 100%; display: flex; flex-direction: column; position: relative;">
+      <div class="inspectstyles-main-content">
         <!-- Header -->
-        <div style="background: #ffffff; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; min-height: 60px;">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <img src="${iconUrl}" style="width: 20px; height: 20px; border-radius: 4px;" alt="InspectStyles">
-            <div>
-              <div style="font-weight: 600; color: #1a202c; font-size: 14px;">InspectStyles</div>
-              <div style="font-size: 11px; color: #718096; margin-top: 1px;">Element Analysis</div>
+        <div class="inspectstyles-header">
+          <div class="inspectstyles-header-content">
+            <img src="${iconUrl}" class="inspectstyles-logo" alt="InspectStyles">
+            <div class="inspectstyles-brand">
+              <div class="inspectstyles-brand-name">InspectStyles</div>
+              <div class="inspectstyles-brand-subtitle">Element Analysis</div>
             </div>
           </div>
-          <button id="inspectstyles-close" style="background: #f7fafc; border: 1px solid #e2e8f0; color: #4a5568; cursor: pointer; padding: 6px 8px; border-radius: 6px; font-size: 14px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;" title="Close Inspector">×</button>
+          <button id="inspectstyles-close" class="inspectstyles-close" title="Close Inspector">×</button>
         </div>
 
         <!-- Status Bar -->
-        <div id="inspectstyles-status" style="padding: 12px 20px; background: #edf2f7; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #4a5568;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 6px; height: 6px; background: #38a169; border-radius: 50%;"></div>
+        <div id="inspectstyles-status" class="inspectstyles-status">
+          <div class="inspectstyles-status-content">
+            <div class="inspectstyles-status-indicator"></div>
             <span>Hover elements to preview • Click to inspect</span>
           </div>
         </div>
 
         <!-- Content Area -->
-        <div id="inspectstyles-content" style="flex: 1; overflow-y: auto;">
-          <div id="inspectstyles-placeholder" style="padding: 60px 20px; text-align: center; color: #a0aec0;">
-            <div style="width: 64px; height: 64px; margin: 0 auto 20px; background: #f7fafc; border: 2px dashed #cbd5e0; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-              <div style="width: 24px; height: 24px; background: #cbd5e0; border-radius: 4px;"></div>
+        <div id="inspectstyles-content" class="inspectstyles-content">
+          <div id="inspectstyles-placeholder" class="inspectstyles-placeholder">
+            <div class="inspectstyles-placeholder-icon">
+              <div class="inspectstyles-placeholder-icon-inner"></div>
             </div>
-            <div style="font-size: 14px; color: #718096; margin-bottom: 8px;">No element selected</div>
-            <div style="font-size: 12px; color: #a0aec0;">Click on any element to view its computed styles</div>
+            <div class="inspectstyles-placeholder-title">No element selected</div>
+            <div class="inspectstyles-placeholder-subtitle">Click on any element to view its computed styles</div>
           </div>
           
-          <div id="inspectstyles-styles" style="display: none;">
+          <div id="inspectstyles-styles" class="inspectstyles-styles">
             <!-- Element Info -->
-            <div style="padding: 20px; border-bottom: 1px solid #e2e8f0; background: #ffffff;">
-              <div style="font-size: 11px; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 500;">Selected Element</div>
-              <div id="inspectstyles-element-info" style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace; font-size: 13px; color: #2d3748; background: #f7fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; font-weight: 500;"></div>
+            <div class="inspectstyles-element-section">
+              <div class="inspectstyles-element-label">Selected Element</div>
+              <div id="inspectstyles-element-info" class="inspectstyles-element-info"></div>
             </div>
 
             <!-- Typography Section -->
-            <div style="background: #ffffff; border-bottom: 1px solid #e2e8f0;">
-              <div style="padding: 16px 20px; background: #f7fafc; font-weight: 600; font-size: 13px; color: #2d3748; border-bottom: 1px solid #e2e8f0;">
+            <div class="inspectstyles-section">
+              <div class="inspectstyles-section-header">
                 Typography
               </div>
               <div id="inspectstyles-typography"></div>
             </div>
 
             <!-- Colors Section -->
-            <div style="background: #ffffff; border-bottom: 1px solid #e2e8f0;">
-              <div style="padding: 16px 20px; background: #f7fafc; font-weight: 600; font-size: 13px; color: #2d3748; border-bottom: 1px solid #e2e8f0;">
+            <div class="inspectstyles-section">
+              <div class="inspectstyles-section-header">
                 Colors
               </div>
               <div id="inspectstyles-colors"></div>
             </div>
 
             <!-- Layout Section -->
-            <div style="background: #ffffff; border-bottom: 1px solid #e2e8f0;">
-              <div style="padding: 16px 20px; background: #f7fafc; font-weight: 600; font-size: 13px; color: #2d3748; border-bottom: 1px solid #e2e8f0;">
+            <div class="inspectstyles-section">
+              <div class="inspectstyles-section-header">
                 Layout & Spacing
               </div>
               <div id="inspectstyles-layout"></div>
             </div>
 
             <!-- Actions -->
-            <div style="padding: 20px; background: #ffffff;">
-              <button id="inspectstyles-copy-all" style="width: 100%; background: #3182ce; color: white; border: none; padding: 12px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 13px; transition: all 0.15s ease;">
+            <div class="inspectstyles-actions">
+              <button id="inspectstyles-copy-all" class="inspectstyles-copy-all">
                 Copy CSS Rules
               </button>
             </div>
@@ -245,124 +249,6 @@ class InspectStyles {
         </div>
       </div>
 
-      <style>
-        #inspectstyles-sidebar * {
-          box-sizing: border-box;
-        }
-        
-        #inspectstyles-resize-handle:hover {
-          background: #e2e8f0 !important;
-        }
-        
-        #inspectstyles-resize-handle:hover > div > div {
-          border-color: #4a5568 !important;
-          background: #4a5568 !important;
-        }
-        
-        #inspectstyles-close:hover {
-          background: #edf2f7 !important;
-          border-color: #cbd5e0 !important;
-        }
-        
-        #inspectstyles-copy-all:hover {
-          background: #2c5aa0 !important;
-        }
-        
-        #inspectstyles-copy-all:active {
-          background: #2a4d8d !important;
-          transform: translateY(1px);
-        }
-        
-        .inspectstyles-property {
-          padding: 16px 20px;
-          border-bottom: 1px solid #f1f5f9;
-          transition: background-color 0.1s ease;
-        }
-        
-        .inspectstyles-property:hover {
-          background: #f8fafc;
-        }
-        
-        .inspectstyles-property:last-child {
-          border-bottom: none;
-        }
-        
-        .inspectstyles-property-label {
-          font-size: 12px;
-          color: #4a5568;
-          margin-bottom: 6px;
-          font-weight: 500;
-        }
-        
-        .inspectstyles-property-value {
-          font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
-          font-size: 12px;
-          color: #1a202c;
-          background: #f7fafc;
-          padding: 8px 12px;
-          border-radius: 4px;
-          border: 1px solid #e2e8f0;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          word-break: break-all;
-          line-height: 1.4;
-        }
-        
-        .inspectstyles-copy-btn {
-          background: #ffffff;
-          border: 1px solid #d1d5db;
-          color: #6b7280;
-          padding: 4px 8px;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 11px;
-          margin-left: 12px;
-          transition: all 0.1s ease;
-          flex-shrink: 0;
-          font-weight: 500;
-        }
-        
-        .inspectstyles-copy-btn:hover {
-          background: #f9fafb;
-          border-color: #9ca3af;
-          color: #374151;
-        }
-        
-        .inspectstyles-copy-btn:active {
-          background: #f3f4f6;
-          transform: translateY(1px);
-        }
-        
-        .inspectstyles-color-preview {
-          width: 18px;
-          height: 18px;
-          border-radius: 3px;
-          border: 1px solid #d1d5db;
-          margin-right: 12px;
-          flex-shrink: 0;
-          background-image: 
-            linear-gradient(45deg, #f3f4f6 25%, transparent 25%), 
-            linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), 
-            linear-gradient(45deg, transparent 75%, #f3f4f6 75%), 
-            linear-gradient(-45deg, transparent 75%, #f3f4f6 75%);
-          background-size: 6px 6px;
-          background-position: 0 0, 0 3px, 3px -3px, -3px 0px;
-        }
-        
-        .inspectstyles-color-container {
-          display: flex;
-          align-items: flex-start;
-          gap: 0;
-        }
-        
-        .inspectstyles-color-values {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-      </style>
     `;
   }
 
@@ -446,15 +332,7 @@ class InspectStyles {
 
   createOverlay() {
     this.overlay = document.createElement("div");
-    this.overlay.style.cssText = `
-      position: absolute;
-      pointer-events: none;
-      border: 2px solid #007acc;
-      background: rgba(0, 122, 204, 0.1);
-      z-index: 2147483646;
-      display: none;
-      transition: all 0.1s ease;
-    `;
+    this.overlay.className = "inspectstyles-overlay";
     document.body.appendChild(this.overlay);
   }
 
@@ -552,10 +430,12 @@ class InspectStyles {
     this.overlay.style.top = rect.top + scrollY + "px";
     this.overlay.style.width = rect.width + "px";
     this.overlay.style.height = rect.height + "px";
-    this.overlay.style.borderColor = selected ? "#ff6b35" : "#007acc";
-    this.overlay.style.background = selected
-      ? "rgba(255, 107, 53, 0.1)"
-      : "rgba(0, 122, 204, 0.1)";
+
+    if (selected) {
+      this.overlay.classList.add("selected");
+    } else {
+      this.overlay.classList.remove("selected");
+    }
   }
 
   updateSidebar(element) {
@@ -683,15 +563,11 @@ class InspectStyles {
       try {
         await navigator.clipboard.writeText(value);
         copyBtn.textContent = "✓";
-        copyBtn.style.background = "#4caf50";
-        copyBtn.style.borderColor = "#4caf50";
-        copyBtn.style.color = "white";
+        copyBtn.classList.add("copied");
 
         setTimeout(() => {
           copyBtn.textContent = "Copy";
-          copyBtn.style.background = "none";
-          copyBtn.style.borderColor = "#555";
-          copyBtn.style.color = "#cccccc";
+          copyBtn.classList.remove("copied");
         }, 1000);
       } catch (error) {
         console.error("Failed to copy:", error);
@@ -706,10 +582,10 @@ class InspectStyles {
     div.className = "inspectstyles-property";
     div.innerHTML = `
       <div class="inspectstyles-property-label">${label}</div>
-      <div style="display: flex; align-items: center; margin-bottom: 8px;">
+      <div class="inspectstyles-color-container">
         <div class="inspectstyles-color-preview" style="background-color: ${rgbValue};"></div>
-        <div style="flex: 1;">
-          <div class="inspectstyles-property-value" style="margin-bottom: 4px;">
+        <div class="inspectstyles-color-values">
+          <div class="inspectstyles-property-value">
             <span>${rgbValue}</span>
             <button class="inspectstyles-copy-btn" data-value="${rgbValue}">Copy</button>
           </div>
@@ -729,15 +605,11 @@ class InspectStyles {
           const value = copyBtn.getAttribute("data-value");
           await navigator.clipboard.writeText(value);
           copyBtn.textContent = "✓";
-          copyBtn.style.background = "#4caf50";
-          copyBtn.style.borderColor = "#4caf50";
-          copyBtn.style.color = "white";
+          copyBtn.classList.add("copied");
 
           setTimeout(() => {
             copyBtn.textContent = "Copy";
-            copyBtn.style.background = "none";
-            copyBtn.style.borderColor = "#555";
-            copyBtn.style.color = "#cccccc";
+            copyBtn.classList.remove("copied");
           }, 1000);
         } catch (error) {
           console.error("Failed to copy:", error);
@@ -827,13 +699,12 @@ class InspectStyles {
       if (button) {
         const originalText = button.textContent;
         button.textContent = "✅ Copied!";
-        button.style.background = "linear-gradient(45deg, #4caf50, #66bb6a)";
+        button.classList.add("copied");
 
         setTimeout(() => {
           if (button && chrome.runtime?.id) {
             button.textContent = originalText;
-            button.style.background =
-              "linear-gradient(45deg, #007acc, #0099ff)";
+            button.classList.remove("copied");
           }
         }, 2000);
       }

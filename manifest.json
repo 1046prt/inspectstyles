@@ -16,6 +16,12 @@
   "background": {
     "service_worker": "background.js"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["styles/sidebar.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "icons": {
     "16": "icons/InspectStyles.png",
     "48": "icons/InspectStyles.png",
