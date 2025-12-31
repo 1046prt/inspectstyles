@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div class="logo">
+          <div class="logo-icon"></div>
+          <h1>InspectStyles</h1>
+        </div>
+      </header>
+
+      <div class="content">
+        <div id="instructions" class="instructions">
+          <div class="icon">🔍</div>
+          <h2>Style Inspector</h2>
+          <p>Launch the sidebar to analyze element styles on this page.</p>
+          <button id="toggleBtn" class="toggle-btn">
+            <span class="btn-icon">▶</span>
+            <span class="btn-text">Launch</span>
+          </button>
+        </div>
+
+        <div id="activeState" class="active-state hidden">
+          <div class="status-indicator">
+            <div class="pulse"></div>
+            <span>Inspector Active</span>
+          </div>
+          <p>Sidebar is open. Hover elements to preview, click to inspect.</p>
+          <button id="deactivateBtn" class="deactivate-btn">
+            <span class="btn-icon">⏹</span>
+            <span class="btn-text">Close</span>
+          </button>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <div class="tip">
+          <strong>Tip:</strong> Press <kbd>Esc</kbd> to close
+        </div>
+      </footer>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
