@@ -1,36 +1,24 @@
-// InspectStyles Background Service Worker
+// InspectStyles background service worker.
+// The popup handles the toolbar click, so this file only deals with the keyboard shortcut.
 
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("InspectStyles extension installed");
-});
-
-// Handle extension icon click
-chrome.action.onClicked.addListener(async (tab) => {
+async function ensureInjected(tabId) {
   try {
-    // Inject content script if needed
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["content.js"],
-    });
+    const res = await chrome.tabs.sendMessage(tabId, { action: "ping" });
+    if (res && res.ok) return;
+  } catch (e) {
+    // content script not there yet
+  }
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+}
 
-    // Then send message to activate inspection
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "toggle-inspector") return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !tab.id) return;
+  try {
+    await ensureInjected(tab.id);
     await chrome.tabs.sendMessage(tab.id, { action: "toggle" });
-  } catch (error) {
-    console.error(
-      "Failed to inject content script or toggle inspection:",
-      error
-    );
+  } catch (e) {
+    // chrome:// pages and the Web Store can't be inspected
   }
-});
-
-// Handle messages from content script and popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "elementSelected") {
-    // Forward message to popup if it's open
-    chrome.runtime.sendMessage(request).catch(() => {
-      // Popup might not be open, ignore error
-    });
-  }
-
-  return true; // Keep message channel open for async response
 });

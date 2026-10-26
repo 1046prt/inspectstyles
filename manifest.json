@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "InspectStyles",
-  "version": "1.0.0",
-  "description": "Font & Color Identifier - Inspect fonts and colors used on any webpage in real time",
-  "permissions": ["activeTab", "scripting"],
+  "version": "2.0.0",
+  "description": "Inspect fonts, colors, contrast and spacing on any webpage. Pick colors, save palettes, export CSS.",
+  "permissions": ["activeTab", "scripting", "storage"],
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "InspectStyles",
@@ -16,12 +16,15 @@
   "background": {
     "service_worker": "background.js"
   },
-  "web_accessible_resources": [
-    {
-      "resources": ["styles/sidebar.css"],
-      "matches": ["<all_urls>"]
+  "commands": {
+    "toggle-inspector": {
+      "suggested_key": {
+        "default": "Alt+Shift+I",
+        "mac": "Alt+Shift+I"
+      },
+      "description": "Turn the inspector on or off"
     }
-  ],
+  },
   "icons": {
     "16": "icons/InspectStyles.png",
     "48": "icons/InspectStyles.png",

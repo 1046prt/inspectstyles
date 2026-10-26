@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InspectStyles: read any page's fonts, colors and spacing</title>
+  <meta name="description" content="A Chrome extension that shows the fonts, colors, contrast and spacing of anything you point at. Pick colors, save palettes, export CSS.">
+  <link rel="icon" href="icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f4f7f9; --surface: #ffffff; --ink: #14202a; --muted: #566673; --line: #dbe3e9;
+      --blue: #1a7fd4; --blue-soft: rgba(26,127,212,.12); --on-blue: #fff;
+      --orange: #f08a2c; --green: #2f9e63; --red: #c0392b;
+      --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --paper: #0c1318; --surface: #141d25; --ink: #e9eff3; --muted: #93a3af; --line: #24313b;
+        --blue: #4aa8f5; --blue-soft: rgba(74,168,245,.16); --on-blue: #08121a; --green: #4cc38a; --red: #ff7b6b; }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 var(--display); -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 6px; }
+    .wrap { width: min(1160px, 100% - 40px); margin-inline: auto; }
+    .mono { font-family: var(--mono); font-size: .86em; }
+
+    /* nav */
+    .nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -.02em; text-decoration: none; }
+    .brand img { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: #fff; }
+    .nav ul { display: flex; gap: 26px; list-style: none; margin: 0; padding: 0; font-size: 15px; color: var(--muted); }
+    .nav ul a { text-decoration: none; padding: 6px 0; }
+    .nav ul a:hover { color: var(--ink); }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 10px; font: 600 15px var(--display); text-decoration: none; border: 1px solid var(--line); background: var(--surface); transition: border-color .15s, transform .15s; cursor: pointer; }
+    .btn:hover { border-color: var(--blue); }
+    .btn.primary { background: var(--blue); color: var(--on-blue); border-color: var(--blue); }
+    .btn.primary:hover { filter: brightness(1.08); }
+
+    /* hero */
+    .hero { padding: 40px 0 28px; display: grid; grid-template-columns: 1.25fr 1fr; gap: 48px; align-items: end; }
+    h1 { font-size: clamp(40px, 6.2vw, 78px); line-height: .98; letter-spacing: -.035em; font-weight: 800; margin: 0; max-width: 11ch; }
+    .hero p { color: var(--muted); font-size: 19px; max-width: 34ch; margin: 0 0 22px; }
+    .cta { display: flex; flex-wrap: wrap; gap: 10px; }
+    .hero .tiny { margin: 14px 0 0; color: var(--muted); font-size: 14px; max-width: none; }
+
+    /* live demo */
+    .demo { display: grid; grid-template-columns: 1.35fr 1fr; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); overflow: hidden; box-shadow: 0 30px 60px -30px rgba(20,32,42,.35); }
+    .stage { padding: 36px; background: #f7f1e8; color: #2b2118; position: relative; min-height: 380px; cursor: crosshair; }
+    .stage * { cursor: crosshair; }
+    .stage .hint { position: absolute; left: 14px; top: 12px; font: 500 12px var(--mono); color: #8a7a68; }
+    .shop { font-family: Georgia, "Iowan Old Style", serif; margin-top: 18px; }
+    .shop .tag { display: inline-block; background: #efe4d3; color: #b9a58a; padding: 4px 12px; border-radius: 99px; font: 500 13px Arial, sans-serif; letter-spacing: .02em; }
+    .shop h2 { font-size: 40px; line-height: 1.05; margin: 14px 0 10px; font-weight: 700; letter-spacing: -.01em; color: #2b2118; }
+    .shop p.lede { font-size: 17px; line-height: 1.6; color: #6a5a48; max-width: 40ch; margin: 0 0 22px; }
+    .shop .buy { display: inline-block; background: #c4491c; color: #fff; padding: 12px 24px; border-radius: 10px; font: 700 16px Arial, sans-serif; border: 2px solid #8d3010; }
+    .shop .price { margin-left: 16px; font: 400 15px "Courier New", monospace; color: #2b2118; }
+    .outline { position: fixed; pointer-events: none; z-index: 5; display: none; outline: 2px solid var(--blue); outline-offset: 1px; background: rgba(26,127,212,.14); border-radius: 3px; transition: all .08s; }
+    .outline.locked { outline-style: solid; background: rgba(26,127,212,.2); }
+
+    .panel { padding: 18px; background: var(--paper); border-left: 1px solid var(--line); font-size: 13.5px; line-height: 1.45; }
+    .panel h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
+    .crumb { font: 500 13px var(--mono); margin-bottom: 14px; color: var(--ink); display: flex; justify-content: space-between; gap: 8px; }
+    .crumb span:last-child { color: var(--muted); }
+    .specimen { border-radius: 10px; padding: 12px 14px; border: 1px solid var(--line); margin-bottom: 12px; overflow: hidden; }
+    .specimen .aa { font-size: 34px; line-height: 1.1; }
+    .kv { display: grid; grid-template-columns: 92px 1fr; gap: 3px 10px; margin: 0 0 14px; }
+    .kv dt { color: var(--muted); }
+    .kv dd { margin: 0; font: 400 12.5px var(--mono); overflow-wrap: anywhere; }
+    .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--line); }
+    .ratio { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+    .ratio b { font-size: 30px; letter-spacing: -.02em; }
+    .pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .pill { font: 600 11.5px var(--display); padding: 3px 9px; border-radius: 99px; }
+    .pill.ok { background: rgba(47,158,99,.15); color: var(--green); }
+    .pill.no { background: rgba(192,57,43,.14); color: var(--red); }
+    .bm { background: rgba(240,138,44,.3); padding: 18px 14px; border-radius: 8px; position: relative; font: 500 11px var(--mono); color: var(--muted); }
+    .bp { background: rgba(110,190,100,.32); padding: 18px 14px; border-radius: 5px; position: relative; }
+    .bc { background: var(--blue-soft); padding: 5px; border-radius: 3px; text-align: center; color: var(--ink); }
+    .bm i, .bp i { position: absolute; font-style: normal; }
+    .bm .t, .bp .t { top: 2px; left: 50%; transform: translateX(-50%); }
+    .bm .b, .bp .b { bottom: 2px; left: 50%; transform: translateX(-50%); }
+    .bm .l, .bp .l { left: 4px; top: 50%; transform: translateY(-50%); }
+    .bm .r, .bp .r { right: 4px; top: 50%; transform: translateY(-50%); }
+    .status { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 99px; background: rgba(47,158,99,.15); color: var(--green); margin-bottom: 10px; }
+    .status.locked { background: var(--blue-soft); color: var(--blue); }
+
+    /* sections */
+    section { padding: 88px 0 0; }
+    h2.title { font-size: clamp(30px, 4vw, 48px); line-height: 1.04; letter-spacing: -.03em; font-weight: 800; margin: 0 0 14px; max-width: 18ch; }
+    .sub { color: var(--muted); max-width: 52ch; margin: 0 0 40px; }
+
+    .rows { display: grid; gap: 0; border-top: 1px solid var(--line); }
+    .feat { display: grid; grid-template-columns: 220px 1fr 1fr; gap: 32px; padding: 32px 0; border-bottom: 1px solid var(--line); align-items: start; }
+    .feat h3 { margin: 0; font-size: 22px; letter-spacing: -.02em; line-height: 1.15; }
+    .feat p { margin: 0; color: var(--muted); }
+    .feat .art { font: 400 13px/1.55 var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
+    .art .c1 { color: var(--blue); } .art .c2 { color: var(--orange); } .art .c3 { color: var(--green); } .art .dim { color: var(--muted); }
+    .swatches { display: flex; gap: 8px; flex-wrap: wrap; font-family: var(--mono); }
+    .swatches span { display: block; width: 46px; height: 46px; border-radius: 9px; border: 1px solid var(--line); }
+
+    .how { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; list-style: none; padding: 0; margin: 0; counter-reset: s; }
+    .how li { counter-increment: s; border-top: 3px solid var(--blue); padding-top: 14px; }
+    .how li::before { content: counter(s); font: 800 30px var(--display); color: var(--blue); display: block; line-height: 1; margin-bottom: 8px; }
+    .how b { display: block; margin-bottom: 4px; }
+    .how span { color: var(--muted); font-size: 15px; }
+    pre.code { background: #0f161b; color: #dbe7ef; border-radius: 12px; padding: 16px 18px; overflow-x: auto; font: 400 13.5px/1.6 var(--mono); margin: 22px 0 0; }
+    .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 36px; }
+    .key { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    kbd { font: 500 12px var(--mono); background: var(--paper); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
+
+    details { border-bottom: 1px solid var(--line); padding: 18px 0; }
+    details:first-of-type { border-top: 1px solid var(--line); }
+    summary { cursor: pointer; font-weight: 600; font-size: 19px; letter-spacing: -.01em; list-style: none; display: flex; justify-content: space-between; gap: 20px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--blue); font-size: 24px; line-height: 1; transition: transform .2s; }
+    details[open] summary::after { transform: rotate(45deg); }
+    details p { color: var(--muted); max-width: 62ch; margin: 10px 0 0; }
+
+    footer { margin-top: 96px; border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+
+    @media (max-width: 960px) {
+      .hero { grid-template-columns: 1fr; gap: 22px; }
+      .demo { grid-template-columns: 1fr; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+      .feat { grid-template-columns: 1fr; gap: 14px; }
+      .how { grid-template-columns: 1fr 1fr; }
+      .nav ul { display: none; }
+    }
+    @media (max-width: 560px) { .how { grid-template-columns: 1fr; } .stage { padding: 28px 20px; } .shop h2 { font-size: 32px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav class="nav" aria-label="Main">
+      <a class="brand" href="#top"><img src="icon.png" alt="">InspectStyles</a>
+      <ul>
+        <li><a href="#features">What it reads</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#faq">Questions</a></li>
+      </ul>
+      <a class="btn" href="https://github.com/1046prt/inspectstyles">View on GitHub</a>
+    </nav>
+
+    <header class="hero" id="top">
+      <h1>Point at anything. Read its styles.</h1>
+      <div>
+        <p>Fonts, colors, contrast and spacing for any element on any site, then copy them as CSS, Tailwind or JSON.</p>
+        <div class="cta">
+          <a class="btn primary" href="#install">Install in two minutes</a>
+          <a class="btn" href="#demo">Try the demo below</a>
+        </div>
+        <p class="tiny">Free and open source. Nothing leaves your browser.</p>
+      </div>
+    </header>
+
+    <div class="demo" id="demo">
+      <div class="stage" id="stage">
+        <span class="hint">Hover anything here. Click to lock it.</span>
+        <div class="shop">
+          <span class="tag">Small batch</span>
+          <h2>Ethiopia Guji, washed</h2>
+          <p class="lede">Bergamot, peach tea and a clean honey finish. Roasted on Tuesdays, shipped on Wednesdays.</p>
+          <span class="buy">Add to cart</span><span class="price">₹ 640 / 250 g</span>
+        </div>
+      </div>
+
+      <aside class="panel" aria-live="polite">
+        <span class="status" id="p-status">Live preview</span>
+        <div class="crumb"><span id="p-sel">h2</span><span id="p-size"></span></div>
+        <div class="specimen" id="p-spec"><div class="aa">Aa</div><div id="p-sample"></div></div>
+        <h3>Typography</h3>
+        <dl class="kv">
+          <dt>Font</dt><dd id="p-font"></dd>
+          <dt>Size</dt><dd id="p-fsize"></dd>
+          <dt>Weight</dt><dd id="p-weight"></dd>
+          <dt>Line height</dt><dd id="p-lh"></dd>
+        </dl>
+        <h3>Colors</h3>
+        <dl class="kv">
+          <dt>Text</dt><dd id="p-fg"></dd>
+          <dt>Background</dt><dd id="p-bg"></dd>
+        </dl>
+        <h3>Contrast</h3>
+        <div class="ratio"><b id="p-ratio"></b><span style="color:var(--muted)">to 1</span></div>
+        <div class="pills" id="p-pills"></div>
+        <h3>Spacing</h3>
+        <div class="bm"><i class="t" id="m-t"></i><i class="r" id="m-r"></i><i class="b" id="m-b"></i><i class="l" id="m-l"></i>
+          <div class="bp"><i class="t" id="p-t"></i><i class="r" id="p-r"></i><i class="b" id="p-b"></i><i class="l" id="p-l"></i>
+            <div class="bc" id="p-box"></div></div></div>
+      </aside>
+    </div>
+    <div class="outline" id="outline"></div>
+  </div>
+
+  <main class="wrap">
+    <section id="features">
+      <h2 class="title">Everything a designer asks a developer for</h2>
+      <p class="sub">The questions that come up on every handoff, answered by pointing at the page.</p>
+      <div class="rows">
+        <article class="feat">
+          <h3>Fonts, as rendered</h3>
+          <p>Family, size in px and rem, weight with its name, line height as a ratio, and a live specimen set in the page's own colors.</p>
+          <div class="art"><span class="c1">Font</span> Georgia<br><span class="c1">Size</span> 40px <span class="dim">2.5rem</span><br><span class="c1">Weight</span> 700 <span class="dim">Bold</span><br><span class="c1">Line height</span> 42px <span class="dim">1.05×</span></div>
+        </article>
+        <article class="feat">
+          <h3>Contrast you can trust</h3>
+          <p>The real background is worked out by walking up the page and blending transparent layers. You get the ratio and a pass or fail for AA and AAA.</p>
+          <div class="art"><span class="c3">4.67</span> contrast ratio<br>AA text <span class="c3">Pass</span> · AA large <span class="c3">Pass</span><br>AAA text <span style="color:var(--red)">Fail</span> · AAA large <span class="c3">Pass</span></div>
+        </article>
+        <article class="feat">
+          <h3>Spacing at a glance</h3>
+          <p>Margin, border and padding are drawn over the page and laid out as a box model in the panel, so layout questions get answered in one look.</p>
+          <div class="art"><span class="c2">margin 0 0 10px</span><br>&nbsp;&nbsp;border 2<br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="c3">padding 12px 24px</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c1">content 82 × 20</span></div>
+        </article>
+        <article class="feat">
+          <h3>The whole page, ranked</h3>
+          <p>Scan once to see every font with its weights and sizes, plus the text and background colors in order of use. Useful for audits and for matching a brand.</p>
+          <div class="art"><div class="swatches"><span style="background:#2b2118"></span><span style="background:#6a5a48"></span><span style="background:#c4491c"></span><span style="background:#f7f1e8"></span><span style="background:#efe4d3"></span></div><br>Georgia <span class="dim">400, 700</span> · Arial <span class="dim">400, 700</span></div>
+        </article>
+        <article class="feat">
+          <h3>Eyedropper and palette</h3>
+          <p>Pick any pixel on screen, including images and gradients. Colors are copied and saved to a palette you can export as CSS variables.</p>
+          <div class="art">:root {<br>&nbsp;&nbsp;--color-1: <span class="c2">#c4491c</span>;<br>&nbsp;&nbsp;--color-2: <span class="c2">#f7f1e8</span>;<br>}</div>
+        </article>
+        <article class="feat">
+          <h3>Copy it your way</h3>
+          <p>One click gives you clean CSS, Tailwind classes or JSON for the locked element. Colors switch between HEX, RGB and HSL.</p>
+          <div class="art"><span class="c1">font-['Arial'] text-[16px] font-[700]</span><br><span class="c1">text-[#ffffff] bg-[#c4491c]</span><br><span class="c1">rounded-[10px] py-[12px] px-[24px]</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="install">
+      <h2 class="title">Running in two minutes</h2>
+      <p class="sub">InspectStyles isn't on the Chrome Web Store yet, so you load it from the folder. It works in Chrome, Edge, Brave and other Chromium browsers.</p>
+      <ol class="how">
+        <li><b>Download</b><span>Get the code from GitHub and unzip it.</span></li>
+        <li><b>Open extensions</b><span>Go to <span class="mono">chrome://extensions</span> and turn on Developer mode.</span></li>
+        <li><b>Load the folder</b><span>Click Load unpacked and choose the InspectStyles folder.</span></li>
+        <li><b>Start inspecting</b><span>Pin the icon, open any site and press Start.</span></li>
+      </ol>
+      <pre class="code">git clone https://github.com/1046prt/inspectstyles.git</pre>
+      <div class="keys">
+        <div class="key"><span>Turn on or off</span><span><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>I</kbd></span></div>
+        <div class="key"><span>Parent, child, siblings</span><kbd>← ↑ ↓ →</kbd></div>
+        <div class="key"><span>Unlock the element</span><kbd>U</kbd></div>
+        <div class="key"><span>Close the panel</span><kbd>Esc</kbd></div>
+      </div>
+    </section>
+
+    <section id="faq">
+      <h2 class="title">Questions</h2>
+      <p class="sub">Short answers about permissions and privacy.</p>
+      <details><summary>What does it send to a server?</summary><p>Nothing. There are no network requests. Styles are read with the browser's own getComputedStyle, and your saved palette and settings live in chrome.storage on your device.</p></details>
+      <details><summary>Why does it need the permissions it asks for?</summary><p>activeTab and scripting let it run on the tab you choose, only when you start it. storage keeps your palette, theme and panel width.</p></details>
+      <details><summary>Why does the eyedropper not work for me?</summary><p>It uses the browser's EyeDropper feature, which needs Chrome or Edge 95 or newer. Firefox and Safari don't offer it.</p></details>
+      <details><summary>Why can't I inspect a chrome:// page?</summary><p>Browsers block extensions on their own pages and on the Chrome Web Store. Any regular website works.</p></details>
+      <details><summary>Is the contrast ratio always exact?</summary><p>It's exact for solid and semi-transparent colors. When a background image sits behind the text, the panel tells you the ratio is an estimate.</p></details>
+    </section>
+  </main>
+
+  <div class="wrap">
+    <footer>
+      <span>InspectStyles · MIT license</span>
+      <span><a href="https://github.com/1046prt/inspectstyles">Source on GitHub</a></span>
+    </footer>
+  </div>
+
+  <script>
+    // The demo reads real computed styles, the same way the extension does.
+    (function () {
+      const stage = document.getElementById("stage");
+      const outline = document.getElementById("outline");
+      const $ = (id) => document.getElementById(id);
+      let locked = null, hovered = null;
+
+      function parse(s) {
+        const m = s.match(/rgba?\(([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?/);
+        return m ? { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] } : { r: 0, g: 0, b: 0, a: 0 };
+      }
+      const hex = (c) => "#" + [c.r, c.g, c.b].map((n) => Math.round(n).toString(16).padStart(2, "0")).join("");
+      const lum = (c) => { const f = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }; return .2126 * f(c.r) + .7152 * f(c.g) + .0722 * f(c.b); };
+      const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+      const px = (v) => Math.round(parseFloat(v) * 100) / 100 || 0;
+
+      function bgOf(el) {
+        for (let n = el; n && n !== document.body; n = n.parentElement) {
+          const c = parse(getComputedStyle(n).backgroundColor);
+          if (c.a >= 1) return c;
+        }
+        return { r: 255, g: 255, b: 255, a: 1 };
+      }
+
+      function selector(el) {
+        const cls = (el.className || "").toString().split(/\s+/).filter(Boolean)[0];
+        return el.tagName.toLowerCase() + (cls ? "." + cls : "");
+      }
+
+      function render(el) {
+        const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+        const fg = parse(cs.color), own = parse(cs.backgroundColor), bg = own.a >= 1 ? own : bgOf(el);
+        const size = px(cs.fontSize), weight = parseInt(cs.fontWeight, 10);
+        const names = { 400: "Regular", 600: "Semi bold", 700: "Bold" };
+        const cr = ratio(fg, bg);
+        const large = size >= 24 || (size >= 18.66 && weight >= 700);
+
+        $("p-sel").textContent = selector(el);
+        $("p-size").textContent = Math.round(r.width) + " × " + Math.round(r.height);
+        const spec = $("p-spec");
+        spec.style.cssText = "background:" + cs.backgroundColor.replace(/rgba\(0, 0, 0, 0\)/, hex(bg)) + ";background:" + hex(bg) + ";color:" + cs.color + ";font-family:" + cs.fontFamily + ";font-weight:" + cs.fontWeight;
+        $("p-sample").textContent = (el.textContent || "").trim().slice(0, 30);
+        $("p-font").textContent = cs.fontFamily.split(",")[0].replace(/["']/g, "");
+        $("p-fsize").textContent = size + "px (" + Math.round((size / 16) * 100) / 100 + "rem)";
+        $("p-weight").textContent = weight + (names[weight] ? " " + names[weight] : "");
+        $("p-lh").textContent = cs.lineHeight === "normal" ? "normal" : px(cs.lineHeight) + "px (" + Math.round((px(cs.lineHeight) / size) * 100) / 100 + "×)";
+        $("p-fg").innerHTML = '<span class="sw" style="background:' + hex(fg) + '"></span>' + hex(fg);
+        $("p-bg").innerHTML = '<span class="sw" style="background:' + hex(bg) + '"></span>' + hex(bg) + (own.a >= 1 ? "" : " (parent)");
+        $("p-ratio").textContent = cr.toFixed(2);
+        const pill = (label, ok) => '<span class="pill ' + (ok ? "ok" : "no") + '">' + label + (ok ? " ✓" : " ✗") + "</span>";
+        $("p-pills").innerHTML = pill("AA text", cr >= 4.5) + pill("AA large", cr >= 3) + pill("AAA text", cr >= 7) + pill("AAA large", cr >= 4.5);
+        const side = (p, k) => px(cs[p + k]);
+        const set = (pre, p) => ["Top", "Right", "Bottom", "Left"].forEach((k, i) => { $(pre + "-" + "trbl"[i]).textContent = side(p, k); });
+        set("m", "margin"); set("p", "padding");
+        const cw = Math.round(r.width - side("padding", "Left") - side("padding", "Right") - side("border", "LeftWidth") - side("border", "RightWidth"));
+        const ch = Math.round(r.height - side("padding", "Top") - side("padding", "Bottom") - side("border", "TopWidth") - side("border", "BottomWidth"));
+        $("p-box").textContent = cw + " × " + ch;
+      }
+
+      function place(el) {
+        if (!el) { outline.style.display = "none"; return; }
+        const r = el.getBoundingClientRect();
+        Object.assign(outline.style, { display: "block", left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
+        outline.classList.toggle("locked", !!locked);
+      }
+
+      function pick(e) {
+        const t = e.target;
+        return t === stage || t.classList.contains("hint") || t.classList.contains("shop") ? null : t;
+      }
+
+      stage.addEventListener("mousemove", (e) => {
+        const t = pick(e);
+        if (!t || t === hovered) return;
+        hovered = t;
+        if (!locked) render(t);
+        place(locked || t);
+      });
+      stage.addEventListener("mouseleave", () => { hovered = null; if (!locked) place(null); });
+      stage.addEventListener("click", (e) => {
+        const t = pick(e);
+        if (!t) { locked = null; $("p-status").textContent = "Live preview"; $("p-status").classList.remove("locked"); place(hovered); return; }
+        locked = t; render(t); place(t);
+        $("p-status").textContent = "Locked. Click empty space to unlock"; $("p-status").classList.add("locked");
+      });
+      window.addEventListener("scroll", () => place(locked || hovered), { passive: true });
+      window.addEventListener("resize", () => place(locked || hovered));
+
+      // start with the headline already read, so the panel is never empty
+      const first = stage.querySelector("h2");
+      render(first);
+    })();
+  </script>
+</body>
+</html>

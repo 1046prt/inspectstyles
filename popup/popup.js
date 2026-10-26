@@ -1,123 +1,86 @@
-// InspectStyles Popup Script
-class PopupController {
-  constructor() {
-    this.isActive = false;
-    this.init();
-  }
+// InspectStyles popup
 
-  init() {
-    this.bindEvents();
-    this.checkActiveState();
-  }
+const toggleBtn = document.getElementById("toggle");
+const statusEl = document.getElementById("status");
+const errorEl = document.getElementById("error");
+const swatchesEl = document.getElementById("swatches");
+const emptyEl = document.getElementById("saved-empty");
+const countEl = document.getElementById("saved-count");
 
-  bindEvents() {
-    const toggleBtn = document.getElementById("toggleBtn");
-    const deactivateBtn = document.getElementById("deactivateBtn");
+let tabId = null;
 
-    if (toggleBtn) {
-      toggleBtn.addEventListener("click", () => this.toggleInspection());
-    }
+function setActive(active) {
+  toggleBtn.textContent = active ? "Stop inspecting" : "Start inspecting";
+  toggleBtn.classList.toggle("stop", active);
+  statusEl.textContent = active ? "Inspector is on" : "Ready";
+  statusEl.classList.toggle("on", active);
+}
 
-    if (deactivateBtn) {
-      deactivateBtn.addEventListener("click", () => this.toggleInspection());
-    }
-  }
+function showError(message) {
+  errorEl.textContent = message;
+  errorEl.hidden = false;
+}
 
-  async checkActiveState() {
-    try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      const response = await chrome.tabs.sendMessage(tab.id, {
-        action: "getStyles",
-      });
-
-      if (response) {
-        this.setActiveState(true);
-      }
-    } catch (error) {
-      // Content script not injected or not active
-      this.setActiveState(false);
-    }
-  }
-
-  async toggleInspection() {
-    try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      // Inject content script if needed
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ["content.js"],
-        });
-      } catch (error) {
-        // Script might already be injected
-      }
-
-      const response = await chrome.tabs.sendMessage(tab.id, {
-        action: "toggle",
-      });
-      this.setActiveState(response.active);
-
-      // Close the popup after activating the inspector
-      if (response.active) {
-        setTimeout(() => {
-          window.close();
-        }, 100);
-      }
-    } catch (error) {
-      console.error("Failed to toggle inspection:", error);
-      this.showError(
-        "Failed to activate inspector. Please refresh the page and try again."
-      );
-    }
-  }
-
-  setActiveState(active) {
-    this.isActive = active;
-    const instructions = document.getElementById("instructions");
-    const activeState = document.getElementById("activeState");
-
-    if (active) {
-      instructions.classList.add("hidden");
-      activeState.classList.remove("hidden");
-    } else {
-      instructions.classList.remove("hidden");
-      activeState.classList.add("hidden");
-    }
-  }
-
-  showError(message) {
-    // Create a simple error notification
-    const errorDiv = document.createElement("div");
-    errorDiv.style.cssText = `
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      background: #fee2e2;
-      color: #dc2626;
-      padding: 12px;
-      border-radius: 6px;
-      border: 1px solid #fecaca;
-      font-size: 12px;
-      z-index: 1000;
-    `;
-    errorDiv.textContent = message;
-    document.body.appendChild(errorDiv);
-
-    setTimeout(() => {
-      errorDiv.remove();
-    }, 5000);
+async function ping() {
+  try {
+    const res = await chrome.tabs.sendMessage(tabId, { action: "ping" });
+    return res && res.ok ? res : null;
+  } catch (e) {
+    return null; // content script isn't on this page yet
   }
 }
 
-// Initialize popup when DOM is loaded
-document.addEventListener("DOMContentLoaded", () => {
-  new PopupController();
+async function init() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  tabId = tab && tab.id;
+  const url = (tab && tab.url) || "";
+  if (!tabId || /^(chrome|edge|about|chrome-extension):/.test(url) || url.startsWith("https://chromewebstore.google.com")) {
+    toggleBtn.disabled = true;
+    showError("Browser pages can't be inspected. Open a regular website and try again.");
+  } else {
+    const res = await ping();
+    setActive(!!(res && res.active));
+  }
+  renderPalette();
+}
+
+toggleBtn.addEventListener("click", async () => {
+  errorEl.hidden = true;
+  try {
+    // only inject when the script isn't there, so listeners never double up
+    if (!(await ping())) {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+    }
+    const res = await chrome.tabs.sendMessage(tabId, { action: "toggle" });
+    setActive(res.active);
+    if (res.active) setTimeout(() => window.close(), 120);
+  } catch (e) {
+    showError("Couldn't start on this page. Reload the tab and try again.");
+  }
 });
+
+async function renderPalette() {
+  let palette = [];
+  try {
+    const data = await chrome.storage.local.get("palette");
+    if (Array.isArray(data.palette)) palette = data.palette;
+  } catch (e) { /* storage unavailable */ }
+
+  swatchesEl.textContent = "";
+  countEl.textContent = palette.length ? `${palette.length} saved` : "";
+  emptyEl.hidden = palette.length > 0;
+  palette.slice(0, 16).forEach((hex) => {
+    const b = document.createElement("button");
+    b.className = "sw";
+    b.style.background = hex;
+    b.title = `Copy ${hex}`;
+    b.setAttribute("aria-label", `Copy ${hex}`);
+    b.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(hex);
+      countEl.textContent = `Copied ${hex}`;
+    });
+    swatchesEl.appendChild(b);
+  });
+}
+
+init();

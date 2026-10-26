@@ -1,49 +1,38 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InspectStyles</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="container">
-      <header class="header">
-        <div class="logo">
-          <div class="logo-icon"></div>
+    <main class="popup">
+      <header class="top">
+        <img src="../icons/InspectStyles.png" alt="" class="logo" />
+        <div class="titles">
           <h1>InspectStyles</h1>
+          <p id="status" class="status" role="status">Ready</p>
         </div>
       </header>
 
-      <div class="content">
-        <div id="instructions" class="instructions">
-          <div class="icon">🔍</div>
-          <h2>Style Inspector</h2>
-          <p>Launch the sidebar to analyze element styles on this page.</p>
-          <button id="toggleBtn" class="toggle-btn">
-            <span class="btn-icon">▶</span>
-            <span class="btn-text">Launch</span>
-          </button>
-        </div>
+      <button id="toggle" class="launch" type="button">Start inspecting</button>
+      <p id="error" class="error" role="alert" hidden></p>
 
-        <div id="activeState" class="active-state hidden">
-          <div class="status-indicator">
-            <div class="pulse"></div>
-            <span>Inspector Active</span>
-          </div>
-          <p>Sidebar is open. Hover elements to preview, click to inspect.</p>
-          <button id="deactivateBtn" class="deactivate-btn">
-            <span class="btn-icon">⏹</span>
-            <span class="btn-text">Close</span>
-          </button>
+      <section class="saved" aria-labelledby="saved-title">
+        <div class="saved-head">
+          <h2 id="saved-title">Saved colors</h2>
+          <span id="saved-count" class="count"></span>
         </div>
-      </div>
+        <div id="swatches" class="swatches"></div>
+        <p id="saved-empty" class="hint">Pick colors with the eyedropper or the + button and they show up here.</p>
+      </section>
 
-      <footer class="footer">
-        <div class="tip">
-          <strong>Tip:</strong> Press <kbd>Esc</kbd> to close
-        </div>
+      <footer class="foot">
+        <span><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>I</kbd> toggle</span>
+        <span><kbd>Esc</kbd> close</span>
       </footer>
-    </div>
-
+    </main>
     <script src="popup.js"></script>
   </body>
 </html>
